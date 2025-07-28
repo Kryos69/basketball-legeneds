@@ -1,0 +1,188 @@
+-- Load Venyx UI
+local Venyx = loadstring(game:HttpGet("https://raw.githubusercontent.com/Stefanuk12/Venyx-UI-Library/main/source2.lua"))()
+local UI = Venyx.new({title = "Spare Stack"})
+
+-- Services
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Workspace = game:GetService("Workspace")
+
+local localPlayer = Players.LocalPlayer
+
+local ControlServiceRE = ReplicatedStorage.Packages.Knit.Services.ControlService.RE
+local StartShoot = ControlServiceRE.StartShoot
+local Shoot = ControlServiceRE.Shoot
+
+-- ==== Auto Green ====
+local autoGreenEnabled = false
+local inputConnection
+
+local function runShootingSequence()
+	StartShoot:FireServer()
+	wait(0.23)
+	Shoot:FireServer(1)
+	wait(0.23)
+	Shoot:FireServer(0)
+end
+
+local function onInputBegan(input, gameProcessed)
+	if gameProcessed then return end
+	if not autoGreenEnabled then return end
+	if input.KeyCode == Enum.KeyCode.E then
+		runShootingSequence()
+	end
+end
+
+-- ==== Walkspeed (CFrame-based) ====
+local walkspeedEnabled = false
+local walkspeedValue = 16
+local moveConnection
+
+local function cframeWalkspeed()
+	if moveConnection then
+		moveConnection:Disconnect()
+		moveConnection = nil
+	end
+	
+	if walkspeedEnabled then
+		moveConnection = RunService.Heartbeat:Connect(function(deltaTime)
+			local char = localPlayer.Character
+			if not char then return end
+			local hrp = char:FindFirstChild("HumanoidRootPart")
+			local humanoid = char:FindFirstChildOfClass("Humanoid")
+			if not hrp or not humanoid then return end
+			
+			local moveDir = humanoid.MoveDirection
+			if moveDir.Magnitude > 0 then
+				hrp.CFrame = hrp.CFrame + (moveDir.Unit * walkspeedValue * deltaTime)
+			end
+		end)
+	else
+		if moveConnection then
+			moveConnection:Disconnect()
+			moveConnection = nil
+		end
+	end
+end
+
+-- ==== Hitbox Expander ====
+local hitboxEnabled = false
+local hitboxRadius = 50
+local hitboxConnection
+
+local function simulateTouch(ball)
+	local character = localPlayer.Character
+	if not character then return end
+	local rootPart = character:FindFirstChild("HumanoidRootPart")
+	if not rootPart then return end
+
+	if rootPart and ball then
+		firetouchinterest(rootPart, ball, 0)
+		task.wait()
+		firetouchinterest(rootPart, ball, 1)
+	end
+end
+
+local function hitboxExpander()
+	if hitboxConnection then
+		hitboxConnection:Disconnect()
+		hitboxConnection = nil
+	end
+
+	if hitboxEnabled then
+		hitboxConnection = RunService.Heartbeat:Connect(function()
+			local character = localPlayer.Character
+			if not character then return end
+			local rootPart = character:FindFirstChild("HumanoidRootPart")
+			if not rootPart then return end
+
+			for _, ball in pairs(Workspace:GetChildren()) do
+				if ball:IsA("BasePart") and ball.Name == "Basketball" then
+					local distance = (ball.Position - rootPart.Position).Magnitude
+					if distance <= hitboxRadius then
+						simulateTouch(ball)
+					end
+				end
+			end
+		end)
+	end
+end
+
+-- ==== UI Setup ====
+
+-- Main page (Auto Green)
+local MainPage = UI:addPage({title = "Main"})
+local MainSection = MainPage:addSection({title = "Auto Green"})
+
+MainSection:addToggle({
+	title = "Enable Auto Green (E key)",
+	callback = function(state)
+		autoGreenEnabled = state
+		if state then
+			if not inputConnection then
+				inputConnection = UserInputService.InputBegan:Connect(onInputBegan)
+			end
+		else
+			if inputConnection then
+				inputConnection:Disconnect()
+				inputConnection = nil
+			end
+		end
+	end
+})
+
+-- Player page (Walkspeed & Hitbox Expander)
+local PlayerPage = UI:addPage({title = "Player"})
+
+-- Walkspeed Section
+local PlayerSection = PlayerPage:addSection({title = "Walkspeed (CFrame)"})
+
+PlayerSection:addToggle({
+	title = "Enable Walkspeed",
+	callback = function(state)
+		walkspeedEnabled = state
+		cframeWalkspeed()
+	end
+})
+
+PlayerSection:addSlider({
+	title = "Walkspeed Value",
+	min = 1,
+	max = 100,
+	default = 16,
+	callback = function(value)
+		if typeof(value) == "number" then
+			walkspeedValue = value
+			if walkspeedEnabled then
+				cframeWalkspeed()
+			end
+		end
+	end
+})
+
+-- Hitbox Expander Section
+local HitboxSection = PlayerPage:addSection({title = "Hitbox Expander"})
+
+HitboxSection:addToggle({
+	title = "Enable Hitbox Expander",
+	callback = function(state)
+		hitboxEnabled = state
+		hitboxExpander()
+	end
+})
+
+HitboxSection:addSlider({
+	title = "Hitbox Radius",
+	min = 10,
+	max = 100,
+	default = 50,
+	callback = function(value)
+		if typeof(value) == "number" then
+			hitboxRadius = value
+		end
+	end
+})
+
+UI:SelectPage(MainPage)
