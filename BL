@@ -15,10 +15,25 @@ local ControlServiceRE = ReplicatedStorage.Packages.Knit.Services.ControlService
 local StartShoot = ControlServiceRE.StartShoot
 local Shoot = ControlServiceRE.Shoot
 
--- ==== Auto Green ====
+-- ==== Variables ====
 local autoGreenEnabled = false
 local inputConnection
 
+local walkspeedEnabled = false
+local walkspeedValue = 16
+local moveConnection
+
+local hitboxEnabled = false
+local hitboxRadius = 50
+local hitboxConnection
+
+local noclipEnabled = false
+local noclipConnection
+local noclipKey = Enum.KeyCode.N -- default key
+
+-- ==== Functions ====
+
+-- Auto Green
 local function runShootingSequence()
 	StartShoot:FireServer()
 	wait(0.23)
@@ -27,25 +42,41 @@ local function runShootingSequence()
 	Shoot:FireServer(0)
 end
 
-local function onInputBegan(input, gameProcessed)
-	if gameProcessed then return end
-	if autoGreenEnabled and input.KeyCode == Enum.KeyCode.E then
-		runShootingSequence()
-	end
+-- Noclip
+local function setCollisions(state)
+	local character = localPlayer.Character
+	if not character then return end
 
-	-- Noclip Keybind
-	if input.KeyCode == Enum.KeyCode.N then
-		noclipEnabled = not noclipEnabled
-		noclip()
-		Venyx:Notify("Noclip", noclipEnabled and "Enabled" or "Disabled")
+	for _, part in pairs(character:GetDescendants()) do
+		if part:IsA("BasePart") then
+			part.CanCollide = state
+		end
 	end
 end
 
--- ==== Walkspeed (CFrame-based) ====
-local walkspeedEnabled = false
-local walkspeedValue = 16
-local moveConnection
+local function noclip()
+	if noclipConnection then
+		noclipConnection:Disconnect()
+		noclipConnection = nil
+	end
 
+	if noclipEnabled then
+		noclipConnection = RunService.Stepped:Connect(function()
+			local character = localPlayer.Character
+			if not character then return end
+
+			for _, part in pairs(character:GetDescendants()) do
+				if part:IsA("BasePart") and part.CanCollide then
+					part.CanCollide = false
+				end
+			end
+		end)
+	else
+		setCollisions(true)
+	end
+end
+
+-- Walkspeed
 local function cframeWalkspeed()
 	if moveConnection then
 		moveConnection:Disconnect()
@@ -68,22 +99,16 @@ local function cframeWalkspeed()
 	end
 end
 
--- ==== Hitbox Expander ====
-local hitboxEnabled = false
-local hitboxRadius = 50
-local hitboxConnection
-
+-- Hitbox Expander
 local function simulateTouch(ball)
 	local character = localPlayer.Character
 	if not character then return end
 	local rootPart = character:FindFirstChild("HumanoidRootPart")
 	if not rootPart then return end
 
-	if rootPart and ball then
-		firetouchinterest(rootPart, ball, 0)
-		task.wait()
-		firetouchinterest(rootPart, ball, 1)
-	end
+	firetouchinterest(rootPart, ball, 0)
+	task.wait()
+	firetouchinterest(rootPart, ball, 1)
 end
 
 local function hitboxExpander()
@@ -111,33 +136,25 @@ local function hitboxExpander()
 	end
 end
 
--- ==== Noclip ====
-local noclipEnabled = false
-local noclipConnection
+-- Input Handler
+local function onInputBegan(input, gameProcessed)
+	if gameProcessed then return end
 
-local function noclip()
-	if noclipConnection then
-		noclipConnection:Disconnect()
-		noclipConnection = nil
+	if autoGreenEnabled and input.KeyCode == Enum.KeyCode.E then
+		runShootingSequence()
 	end
 
-	if noclipEnabled then
-		noclipConnection = RunService.Stepped:Connect(function()
-			local character = localPlayer.Character
-			if not character then return end
-
-			for _, part in pairs(character:GetDescendants()) do
-				if part:IsA("BasePart") and part.CanCollide then
-					part.CanCollide = false
-				end
-			end
-		end)
+	-- Custom Noclip Keybind
+	if input.KeyCode == noclipKey then
+		noclipEnabled = not noclipEnabled
+		noclip()
+		Venyx:Notify("Noclip", noclipEnabled and "Enabled" or "Disabled")
 	end
 end
 
 -- ==== UI Setup ====
 
--- Main page (Auto Green)
+-- Main Page
 local MainPage = UI:addPage({title = "Main"})
 local MainSection = MainPage:addSection({title = "Auto Green"})
 
@@ -158,10 +175,10 @@ MainSection:addToggle({
 	end
 })
 
--- Player page (Walkspeed, Hitbox Expander, Noclip)
+-- Player Page
 local PlayerPage = UI:addPage({title = "Player"})
 
--- Walkspeed Section
+-- Walkspeed
 local PlayerSection = PlayerPage:addSection({title = "Walkspeed (CFrame)"})
 
 PlayerSection:addToggle({
@@ -187,7 +204,7 @@ PlayerSection:addSlider({
 	end
 })
 
--- Hitbox Expander Section
+-- Hitbox Expander
 local HitboxSection = PlayerPage:addSection({title = "Hitbox Expander"})
 
 HitboxSection:addToggle({
@@ -214,13 +231,21 @@ HitboxSection:addSlider({
 local NoclipSection = PlayerPage:addSection({title = "Noclip"})
 
 NoclipSection:addToggle({
-	title = "Enable Noclip (Keybind: N)",
+	title = "Enable Noclip",
 	callback = function(state)
 		noclipEnabled = state
 		noclip()
 	end
 })
 
--- Initialize
+NoclipSection:addKeybind({
+	title = "Noclip Toggle Key",
+	default = Enum.KeyCode.N,
+	callback = function(key)
+		noclipKey = key
+	end
+})
+
+-- Init
 UI:SelectPage(MainPage)
 UserInputService.InputBegan:Connect(onInputBegan)
