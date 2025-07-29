@@ -1,31 +1,36 @@
 -- // Load Rayfield UI Library
 local Rayfield = loadstring(game:HttpGet("https://sirius.menu/rayfield"))()
 
+-- Services
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
+
 local localPlayer = Players.LocalPlayer
 
+-- Control Service Remotes
 local ControlServiceRE = ReplicatedStorage.Packages.Knit.Services.ControlService.RE
 local StartShoot = ControlServiceRE.StartShoot
 local Shoot = ControlServiceRE.Shoot
+local DunkRemote = ControlServiceRE.Dunk
 
--- // Window & Tab Setup
+-- Animations folder for dunking
+local animationsFolder = ReplicatedStorage:WaitForChild("Assets"):WaitForChild("Animations_R15")
+
+-- === Window & Tabs ===
 local Window = Rayfield:CreateWindow({
 	Name = "Spare Stack",
 	LoadingTitle = "Loading...",
-	ConfigurationSaving = {
-		Enabled = false
-	}
+	ConfigurationSaving = { Enabled = false }
 })
 
 local mainTab = Window:CreateTab("Main", 4483362458)
 local playerTab = Window:CreateTab("Player", 4483362458)
 local miscTab = Window:CreateTab("Misc", 4483362458)
 
--- // Auto Green
+-- === Auto Green ===
 local autoGreenEnabled = false
 
 local function runShootingSequence()
@@ -51,7 +56,7 @@ mainTab:CreateToggle({
 	end
 })
 
--- // Walkspeed
+-- === Walkspeed ===
 local walkspeedEnabled = false
 local walkspeedValue = 16
 local moveConnection
@@ -98,7 +103,7 @@ playerTab:CreateSlider({
 	end
 })
 
--- // Hitbox Expander
+-- === Hitbox Expander ===
 local hitboxEnabled = false
 local hitboxRadius = 50
 local hitboxConnection
@@ -152,14 +157,14 @@ playerTab:CreateSlider({
 	Name = "Hitbox Radius",
 	Range = {10, 100},
 	Increment = 1,
-	CurrentValue = 50,
 	Suffix = "Studs",
+	CurrentValue = 50,
 	Callback = function(value)
 		hitboxRadius = value
 	end
 })
 
--- // Noclip
+-- === Noclip ===
 local noclipEnabled = false
 local noclipConnection
 
@@ -205,13 +210,14 @@ playerTab:CreateToggle({
 	end
 })
 
--- // Misc: Lay on Ground
+-- === Misc: Lay on Ground (simple ragdoll-ish) ===
 miscTab:CreateButton({
 	Name = "Lay on Ground (Ragdoll)",
 	Callback = function()
 		local character = localPlayer.Character
-		if character and character:FindFirstChild("HumanoidRootPart") then
-			character.Humanoid:ChangeState(Enum.HumanoidStateType.Physics)
+		if character and character:FindFirstChild("HumanoidRootPart") and character:FindFirstChildOfClass("Humanoid") then
+			local humanoid = character:FindFirstChildOfClass("Humanoid")
+			humanoid:ChangeState(Enum.HumanoidStateType.Physics)
 			local hrp = character:FindFirstChild("HumanoidRootPart")
 			if hrp then
 				hrp.CFrame = hrp.CFrame * CFrame.Angles(math.rad(90), 0, 0)
@@ -220,3 +226,51 @@ miscTab:CreateButton({
 	end
 })
 
+-- === Dunker Changer Setup ===
+local dunkAnimations = {
+	"Dunk_Default",
+	"Dunk_Reverse",
+	"Dunk_Tomahawk",
+	"Dunk_Windmill"
+}
+
+local currentDunkTrack = nil
+local selectedDunkAnimation = dunkAnimations[1]
+
+local function playDunkAnimation(animName)
+	local character = localPlayer.Character
+	if not character then return end
+	local humanoid = character:FindFirstChildOfClass("Humanoid")
+	if not humanoid then return end
+
+	if currentDunkTrack then
+		currentDunkTrack:Stop()
+		currentDunkTrack:Destroy()
+		currentDunkTrack = nil
+	end
+
+	local animObj = animationsFolder:FindFirstChild(animName)
+	if animObj and animObj:IsA("Animation") then
+		currentDunkTrack = humanoid:LoadAnimation(animObj)
+		currentDunkTrack:Play()
+	else
+		warn("Animation "..animName.." not found!")
+	end
+end
+
+-- Override Dunk Remote to play selected animation on dunk
+local oldFireServer = DunkRemote.FireServer
+DunkRemote.FireServer = function(self, ...)
+	oldFireServer(self, ...)
+	playDunkAnimation(selectedDunkAnimation)
+end
+
+-- Add Dunker Changer dropdown to misc tab
+miscTab:CreateDropdown({
+	Name = "Dunker Changer",
+	Options = dunkAnimations,
+	CurrentOption = selectedDunkAnimation,
+	Callback = function(option)
+		selectedDunkAnimation = option
+	end
+})
