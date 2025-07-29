@@ -1,7 +1,7 @@
 -- // Load Rayfield UI Library
 local Rayfield = loadstring(game:HttpGet("https://sirius.menu/rayfield"))()
 
--- Services
+-- // Services
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
@@ -10,16 +10,12 @@ local Workspace = game:GetService("Workspace")
 
 local localPlayer = Players.LocalPlayer
 
--- Control Service Remotes
+-- // Control Service Remotes
 local ControlServiceRE = ReplicatedStorage.Packages.Knit.Services.ControlService.RE
 local StartShoot = ControlServiceRE.StartShoot
 local Shoot = ControlServiceRE.Shoot
-local StartDunkRemote = ControlServiceRE.StartDunk
 
--- Animations folder for dunking
-local animationsFolder = ReplicatedStorage:WaitForChild("Assets"):WaitForChild("Animations_R15")
-
--- === Window & Tabs ===
+-- // Rayfield UI Setup
 local Window = Rayfield:CreateWindow({
 	Name = "Spare Stack",
 	LoadingTitle = "Loading...",
@@ -30,7 +26,7 @@ local mainTab = Window:CreateTab("Main", 4483362458)
 local playerTab = Window:CreateTab("Player", 4483362458)
 local miscTab = Window:CreateTab("Misc", 4483362458)
 
--- === Auto Green ===
+-- // Auto Green
 local autoGreenEnabled = false
 
 local function runShootingSequence()
@@ -56,7 +52,7 @@ mainTab:CreateToggle({
 	end
 })
 
--- === Walkspeed ===
+-- // Walkspeed
 local walkspeedEnabled = false
 local walkspeedValue = 16
 local moveConnection
@@ -70,14 +66,13 @@ local function cframeWalkspeed()
 	if walkspeedEnabled then
 		moveConnection = RunService.Heartbeat:Connect(function(deltaTime)
 			local char = localPlayer.Character
-			if not char then return end
-			local hrp = char:FindFirstChild("HumanoidRootPart")
-			local humanoid = char:FindFirstChildOfClass("Humanoid")
-			if not hrp or not humanoid then return end
-
-			local moveDir = humanoid.MoveDirection
-			if moveDir.Magnitude > 0 then
-				hrp.CFrame = hrp.CFrame + (moveDir.Unit * walkspeedValue * deltaTime)
+			local hrp = char and char:FindFirstChild("HumanoidRootPart")
+			local humanoid = char and char:FindFirstChildOfClass("Humanoid")
+			if hrp and humanoid then
+				local moveDir = humanoid.MoveDirection
+				if moveDir.Magnitude > 0 then
+					hrp.CFrame = hrp.CFrame + (moveDir.Unit * walkspeedValue * deltaTime)
+				end
 			end
 		end)
 	end
@@ -103,20 +98,19 @@ playerTab:CreateSlider({
 	end
 })
 
--- === Hitbox Expander ===
+-- // Hitbox Expander
 local hitboxEnabled = false
 local hitboxRadius = 50
 local hitboxConnection
 
 local function simulateTouch(ball)
 	local character = localPlayer.Character
-	if not character then return end
-	local rootPart = character:FindFirstChild("HumanoidRootPart")
-	if not rootPart then return end
-
-	firetouchinterest(rootPart, ball, 0)
-	task.wait()
-	firetouchinterest(rootPart, ball, 1)
+	local rootPart = character and character:FindFirstChild("HumanoidRootPart")
+	if rootPart then
+		firetouchinterest(rootPart, ball, 0)
+		task.wait()
+		firetouchinterest(rootPart, ball, 1)
+	end
 end
 
 local function hitboxExpander()
@@ -127,15 +121,13 @@ local function hitboxExpander()
 
 	if hitboxEnabled then
 		hitboxConnection = RunService.Heartbeat:Connect(function()
-			local character = localPlayer.Character
-			if not character then return end
-			local rootPart = character:FindFirstChild("HumanoidRootPart")
+			local char = localPlayer.Character
+			local rootPart = char and char:FindFirstChild("HumanoidRootPart")
 			if not rootPart then return end
 
 			for _, ball in pairs(Workspace:GetChildren()) do
 				if ball:IsA("BasePart") and ball.Name == "Basketball" then
-					local distance = (ball.Position - rootPart.Position).Magnitude
-					if distance <= hitboxRadius then
+					if (ball.Position - rootPart.Position).Magnitude <= hitboxRadius then
 						simulateTouch(ball)
 					end
 				end
@@ -164,15 +156,15 @@ playerTab:CreateSlider({
 	end
 })
 
--- === Noclip ===
+-- // Noclip
 local noclipEnabled = false
 local noclipConnection
 
 local function setCollisions(state)
-	local character = localPlayer.Character
-	if not character then return end
+	local char = localPlayer.Character
+	if not char then return end
 
-	for _, part in pairs(character:GetDescendants()) do
+	for _, part in ipairs(char:GetDescendants()) do
 		if part:IsA("BasePart") then
 			part.CanCollide = state
 		end
@@ -187,12 +179,12 @@ local function noclip()
 
 	if noclipEnabled then
 		noclipConnection = RunService.Stepped:Connect(function()
-			local character = localPlayer.Character
-			if not character then return end
-
-			for _, part in pairs(character:GetDescendants()) do
-				if part:IsA("BasePart") and part.CanCollide then
-					part.CanCollide = false
+			local char = localPlayer.Character
+			if char then
+				for _, part in ipairs(char:GetDescendants()) do
+					if part:IsA("BasePart") then
+						part.CanCollide = false
+					end
 				end
 			end
 		end)
@@ -207,71 +199,5 @@ playerTab:CreateToggle({
 	Callback = function(state)
 		noclipEnabled = state
 		noclip()
-	end
-})
-
--- === Misc: Lay on Ground (simple ragdoll-ish) ===
-miscTab:CreateButton({
-	Name = "Lay on Ground (Ragdoll)",
-	Callback = function()
-		local character = localPlayer.Character
-		if character and character:FindFirstChild("HumanoidRootPart") and character:FindFirstChildOfClass("Humanoid") then
-			local humanoid = character:FindFirstChildOfClass("Humanoid")
-			humanoid:ChangeState(Enum.HumanoidStateType.Physics)
-			local hrp = character:FindFirstChild("HumanoidRootPart")
-			if hrp then
-				hrp.CFrame = hrp.CFrame * CFrame.Angles(math.rad(90), 0, 0)
-			end
-		end
-	end
-})
-
--- === Dunker Changer Setup ===
-local dunkAnimations = {
-	"Dunk_Default",
-	"Dunk_Reverse",
-	"Dunk_Tomahawk",
-	"Dunk_Windmill"
-}
-
-local currentDunkTrack = nil
-local selectedDunkAnimation = dunkAnimations[1]
-
-local function playDunkAnimation(animName)
-	local character = localPlayer.Character
-	if not character then return end
-	local humanoid = character:FindFirstChildOfClass("Humanoid")
-	if not humanoid then return end
-
-	if currentDunkTrack then
-		currentDunkTrack:Stop()
-		currentDunkTrack:Destroy()
-		currentDunkTrack = nil
-	end
-
-	local animObj = animationsFolder:FindFirstChild(animName)
-	if animObj and animObj:IsA("Animation") then
-		currentDunkTrack = humanoid:LoadAnimation(animObj)
-		currentDunkTrack:Play()
-	else
-		warn("Animation "..animName.." not found!")
-	end
-end
-
--- Override StartDunk Remote to play selected animation on dunk
-local oldStartDunkFireServer = StartDunkRemote.FireServer
-
-StartDunkRemote.FireServer = function(self, ...)
-	oldStartDunkFireServer(self, ...)
-	playDunkAnimation(selectedDunkAnimation)
-end
-
--- Add Dunker Changer dropdown to misc tab
-miscTab:CreateDropdown({
-	Name = "Dunker Changer",
-	Options = dunkAnimations,
-	CurrentOption = selectedDunkAnimation,
-	Callback = function(option)
-		selectedDunkAnimation = option
 	end
 })
