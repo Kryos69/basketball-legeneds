@@ -14,7 +14,7 @@ local localPlayer = Players.LocalPlayer
 local ControlServiceRE = ReplicatedStorage.Packages.Knit.Services.ControlService.RE
 local StartShoot = ControlServiceRE.StartShoot
 local Shoot = ControlServiceRE.Shoot
-local DunkRemote = ControlServiceRE.Dunk
+local StartDunkRemote = ControlServiceRE.StartDunk
 
 -- Animations folder for dunking
 local animationsFolder = ReplicatedStorage:WaitForChild("Assets"):WaitForChild("Animations_R15")
@@ -258,10 +258,11 @@ local function playDunkAnimation(animName)
 	end
 end
 
--- Override Dunk Remote to play selected animation on dunk
-local oldFireServer = DunkRemote.FireServer
-DunkRemote.FireServer = function(self, ...)
-	oldFireServer(self, ...)
+-- Override StartDunk Remote to play selected animation on dunk
+local oldStartDunkFireServer = StartDunkRemote.FireServer
+
+StartDunkRemote.FireServer = function(self, ...)
+	oldStartDunkFireServer(self, ...)
 	playDunkAnimation(selectedDunkAnimation)
 end
 
