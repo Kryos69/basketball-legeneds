@@ -29,7 +29,13 @@ local hitboxConnection
 
 local noclipEnabled = false
 local noclipConnection
-local noclipKey = Enum.KeyCode.N -- default key
+local noclipKey = Enum.KeyCode.N
+
+-- Lay Toggle
+local laying = false
+local layKey = Enum.KeyCode.L
+local layAnimation
+local layTrack
 
 -- ==== Functions ====
 
@@ -46,7 +52,6 @@ end
 local function setCollisions(state)
 	local character = localPlayer.Character
 	if not character then return end
-
 	for _, part in pairs(character:GetDescendants()) do
 		if part:IsA("BasePart") then
 			part.CanCollide = state
@@ -64,7 +69,6 @@ local function noclip()
 		noclipConnection = RunService.Stepped:Connect(function()
 			local character = localPlayer.Character
 			if not character then return end
-
 			for _, part in pairs(character:GetDescendants()) do
 				if part:IsA("BasePart") and part.CanCollide then
 					part.CanCollide = false
@@ -82,7 +86,7 @@ local function cframeWalkspeed()
 		moveConnection:Disconnect()
 		moveConnection = nil
 	end
-	
+
 	if walkspeedEnabled then
 		moveConnection = RunService.Heartbeat:Connect(function(deltaTime)
 			local char = localPlayer.Character
@@ -90,7 +94,7 @@ local function cframeWalkspeed()
 			local hrp = char:FindFirstChild("HumanoidRootPart")
 			local humanoid = char:FindFirstChildOfClass("Humanoid")
 			if not hrp or not humanoid then return end
-			
+
 			local moveDir = humanoid.MoveDirection
 			if moveDir.Magnitude > 0 then
 				hrp.CFrame = hrp.CFrame + (moveDir.Unit * walkspeedValue * deltaTime)
@@ -136,6 +140,33 @@ local function hitboxExpander()
 	end
 end
 
+-- Lay function
+local function toggleLay()
+	local character = localPlayer.Character
+	if not character then return end
+	local humanoid = character:FindFirstChildOfClass("Humanoid")
+	if not humanoid then return end
+
+	if laying then
+		-- Stop laying
+		laying = false
+		if layTrack then
+			layTrack:Stop()
+			layTrack:Destroy()
+			layTrack = nil
+		end
+	else
+		-- Start laying
+		laying = true
+		if not layAnimation then
+			layAnimation = Instance.new("Animation")
+			layAnimation.AnimationId = "rbxassetid://507768133" -- R15 lay animation
+		end
+		layTrack = humanoid:LoadAnimation(layAnimation)
+		layTrack:Play()
+	end
+end
+
 -- Input Handler
 local function onInputBegan(input, gameProcessed)
 	if gameProcessed then return end
@@ -144,11 +175,14 @@ local function onInputBegan(input, gameProcessed)
 		runShootingSequence()
 	end
 
-	-- Custom Noclip Keybind
 	if input.KeyCode == noclipKey then
 		noclipEnabled = not noclipEnabled
 		noclip()
 		Venyx:Notify("Noclip", noclipEnabled and "Enabled" or "Disabled")
+	end
+
+	if input.KeyCode == layKey then
+		toggleLay()
 	end
 end
 
@@ -178,9 +212,7 @@ MainSection:addToggle({
 -- Player Page
 local PlayerPage = UI:addPage({title = "Player"})
 
--- Walkspeed
 local PlayerSection = PlayerPage:addSection({title = "Walkspeed (CFrame)"})
-
 PlayerSection:addToggle({
 	title = "Enable Walkspeed",
 	callback = function(state)
@@ -188,7 +220,6 @@ PlayerSection:addToggle({
 		cframeWalkspeed()
 	end
 })
-
 PlayerSection:addSlider({
 	title = "Walkspeed Value",
 	min = 1,
@@ -204,9 +235,7 @@ PlayerSection:addSlider({
 	end
 })
 
--- Hitbox Expander
 local HitboxSection = PlayerPage:addSection({title = "Hitbox Expander"})
-
 HitboxSection:addToggle({
 	title = "Enable Hitbox Expander",
 	callback = function(state)
@@ -214,7 +243,6 @@ HitboxSection:addToggle({
 		hitboxExpander()
 	end
 })
-
 HitboxSection:addSlider({
 	title = "Hitbox Radius",
 	min = 10,
@@ -227,9 +255,7 @@ HitboxSection:addSlider({
 	end
 })
 
--- Noclip Section
 local NoclipSection = PlayerPage:addSection({title = "Noclip"})
-
 NoclipSection:addToggle({
 	title = "Enable Noclip",
 	callback = function(state)
@@ -237,12 +263,23 @@ NoclipSection:addToggle({
 		noclip()
 	end
 })
-
 NoclipSection:addKeybind({
 	title = "Noclip Toggle Key",
 	default = Enum.KeyCode.N,
 	callback = function(key)
 		noclipKey = key
+	end
+})
+
+-- Misc Page
+local MiscPage = UI:addPage({title = "Misc"})
+local MiscSection = MiscPage:addSection({title = "Utility"})
+
+MiscSection:addKeybind({
+	title = "Lay on Ground",
+	default = layKey,
+	callback = function(key)
+		layKey = key
 	end
 })
 
