@@ -1,86 +1,61 @@
--- Load Venyx UI
-local Venyx = loadstring(game:HttpGet("https://raw.githubusercontent.com/Stefanuk12/Venyx-UI-Library/main/source2.lua"))()
-local UI = Venyx.new({title = "Spare Stack"})
+-- // Load Rayfield UI Library
+local Rayfield = loadstring(game:HttpGet("https://sirius.menu/rayfield"))()
 
--- Services
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
-
 local localPlayer = Players.LocalPlayer
 
 local ControlServiceRE = ReplicatedStorage.Packages.Knit.Services.ControlService.RE
 local StartShoot = ControlServiceRE.StartShoot
 local Shoot = ControlServiceRE.Shoot
 
--- ==== Variables ====
-local autoGreenEnabled = false
-local inputConnection
+-- // Window & Tab Setup
+local Window = Rayfield:CreateWindow({
+	Name = "Spare Stack",
+	LoadingTitle = "Loading...",
+	ConfigurationSaving = {
+		Enabled = false
+	}
+})
 
+local mainTab = Window:CreateTab("Main", 4483362458)
+local playerTab = Window:CreateTab("Player", 4483362458)
+local miscTab = Window:CreateTab("Misc", 4483362458)
+
+-- // Auto Green
+local autoGreenEnabled = false
+
+local function runShootingSequence()
+	StartShoot:FireServer()
+	task.wait(0.23)
+	Shoot:FireServer(1)
+	task.wait(0.23)
+	Shoot:FireServer(0)
+end
+
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+	if gameProcessed then return end
+	if autoGreenEnabled and input.KeyCode == Enum.KeyCode.E then
+		runShootingSequence()
+	end
+end)
+
+mainTab:CreateToggle({
+	Name = "Enable Auto Green (E key)",
+	CurrentValue = false,
+	Callback = function(state)
+		autoGreenEnabled = state
+	end
+})
+
+-- // Walkspeed
 local walkspeedEnabled = false
 local walkspeedValue = 16
 local moveConnection
 
-local hitboxEnabled = false
-local hitboxRadius = 50
-local hitboxConnection
-
-local noclipEnabled = false
-local noclipConnection
-local noclipKey = Enum.KeyCode.N
-
--- Lay Toggle
-local laying = false
-local layKey = Enum.KeyCode.L
-local layAnimation
-local layTrack
-
--- ==== Functions ====
-
--- Auto Green
-local function runShootingSequence()
-	StartShoot:FireServer()
-	wait(0.23)
-	Shoot:FireServer(1)
-	wait(0.23)
-	Shoot:FireServer(0)
-end
-
--- Noclip
-local function setCollisions(state)
-	local character = localPlayer.Character
-	if not character then return end
-	for _, part in pairs(character:GetDescendants()) do
-		if part:IsA("BasePart") then
-			part.CanCollide = state
-		end
-	end
-end
-
-local function noclip()
-	if noclipConnection then
-		noclipConnection:Disconnect()
-		noclipConnection = nil
-	end
-
-	if noclipEnabled then
-		noclipConnection = RunService.Stepped:Connect(function()
-			local character = localPlayer.Character
-			if not character then return end
-			for _, part in pairs(character:GetDescendants()) do
-				if part:IsA("BasePart") and part.CanCollide then
-					part.CanCollide = false
-				end
-			end
-		end)
-	else
-		setCollisions(true)
-	end
-end
-
--- Walkspeed
 local function cframeWalkspeed()
 	if moveConnection then
 		moveConnection:Disconnect()
@@ -103,7 +78,31 @@ local function cframeWalkspeed()
 	end
 end
 
--- Hitbox Expander
+playerTab:CreateToggle({
+	Name = "Enable Walkspeed",
+	CurrentValue = false,
+	Callback = function(state)
+		walkspeedEnabled = state
+		cframeWalkspeed()
+	end
+})
+
+playerTab:CreateSlider({
+	Name = "Walkspeed Value",
+	Range = {1, 100},
+	Increment = 1,
+	Suffix = "Speed",
+	CurrentValue = 16,
+	Callback = function(value)
+		walkspeedValue = value
+	end
+})
+
+-- // Hitbox Expander
+local hitboxEnabled = false
+local hitboxRadius = 50
+local hitboxConnection
+
 local function simulateTouch(ball)
 	local character = localPlayer.Character
 	if not character then return end
@@ -140,149 +139,84 @@ local function hitboxExpander()
 	end
 end
 
--- Lay function
-local function toggleLay()
-	local character = localPlayer.Character
-	if not character then return end
-	local humanoid = character:FindFirstChildOfClass("Humanoid")
-	if not humanoid then return end
-
-	if laying then
-		-- Stop laying
-		laying = false
-		if layTrack then
-			layTrack:Stop()
-			layTrack:Destroy()
-			layTrack = nil
-		end
-	else
-		-- Start laying
-		laying = true
-		if not layAnimation then
-			layAnimation = Instance.new("Animation")
-			layAnimation.AnimationId = "rbxassetid://507768133" -- R15 lay animation
-		end
-		layTrack = humanoid:LoadAnimation(layAnimation)
-		layTrack:Play()
-	end
-end
-
--- Input Handler
-local function onInputBegan(input, gameProcessed)
-	if gameProcessed then return end
-
-	if autoGreenEnabled and input.KeyCode == Enum.KeyCode.E then
-		runShootingSequence()
-	end
-
-	if input.KeyCode == noclipKey then
-		noclipEnabled = not noclipEnabled
-		noclip()
-		Venyx:Notify("Noclip", noclipEnabled and "Enabled" or "Disabled")
-	end
-
-	if input.KeyCode == layKey then
-		toggleLay()
-	end
-end
-
--- ==== UI Setup ====
-
--- Main Page
-local MainPage = UI:addPage({title = "Main"})
-local MainSection = MainPage:addSection({title = "Auto Green"})
-
-MainSection:addToggle({
-	title = "Enable Auto Green (E key)",
-	callback = function(state)
-		autoGreenEnabled = state
-		if state then
-			if not inputConnection then
-				inputConnection = UserInputService.InputBegan:Connect(onInputBegan)
-			end
-		else
-			if inputConnection then
-				inputConnection:Disconnect()
-				inputConnection = nil
-			end
-		end
-	end
-})
-
--- Player Page
-local PlayerPage = UI:addPage({title = "Player"})
-
-local PlayerSection = PlayerPage:addSection({title = "Walkspeed (CFrame)"})
-PlayerSection:addToggle({
-	title = "Enable Walkspeed",
-	callback = function(state)
-		walkspeedEnabled = state
-		cframeWalkspeed()
-	end
-})
-PlayerSection:addSlider({
-	title = "Walkspeed Value",
-	min = 1,
-	max = 100,
-	default = 16,
-	callback = function(value)
-		if typeof(value) == "number" then
-			walkspeedValue = value
-			if walkspeedEnabled then
-				cframeWalkspeed()
-			end
-		end
-	end
-})
-
-local HitboxSection = PlayerPage:addSection({title = "Hitbox Expander"})
-HitboxSection:addToggle({
-	title = "Enable Hitbox Expander",
-	callback = function(state)
+playerTab:CreateToggle({
+	Name = "Enable Hitbox Expander",
+	CurrentValue = false,
+	Callback = function(state)
 		hitboxEnabled = state
 		hitboxExpander()
 	end
 })
-HitboxSection:addSlider({
-	title = "Hitbox Radius",
-	min = 10,
-	max = 100,
-	default = 50,
-	callback = function(value)
-		if typeof(value) == "number" then
-			hitboxRadius = value
-		end
+
+playerTab:CreateSlider({
+	Name = "Hitbox Radius",
+	Range = {10, 100},
+	Increment = 1,
+	CurrentValue = 50,
+	Suffix = "Studs",
+	Callback = function(value)
+		hitboxRadius = value
 	end
 })
 
-local NoclipSection = PlayerPage:addSection({title = "Noclip"})
-NoclipSection:addToggle({
-	title = "Enable Noclip",
-	callback = function(state)
+-- // Noclip
+local noclipEnabled = false
+local noclipConnection
+
+local function setCollisions(state)
+	local character = localPlayer.Character
+	if not character then return end
+
+	for _, part in pairs(character:GetDescendants()) do
+		if part:IsA("BasePart") then
+			part.CanCollide = state
+		end
+	end
+end
+
+local function noclip()
+	if noclipConnection then
+		noclipConnection:Disconnect()
+		noclipConnection = nil
+	end
+
+	if noclipEnabled then
+		noclipConnection = RunService.Stepped:Connect(function()
+			local character = localPlayer.Character
+			if not character then return end
+
+			for _, part in pairs(character:GetDescendants()) do
+				if part:IsA("BasePart") and part.CanCollide then
+					part.CanCollide = false
+				end
+			end
+		end)
+	else
+		setCollisions(true)
+	end
+end
+
+playerTab:CreateToggle({
+	Name = "Enable Noclip",
+	CurrentValue = false,
+	Callback = function(state)
 		noclipEnabled = state
 		noclip()
 	end
 })
-NoclipSection:addKeybind({
-	title = "Noclip Toggle Key",
-	default = Enum.KeyCode.N,
-	callback = function(key)
-		noclipKey = key
+
+-- // Misc: Lay on Ground
+miscTab:CreateButton({
+	Name = "Lay on Ground (Ragdoll)",
+	Callback = function()
+		local character = localPlayer.Character
+		if character and character:FindFirstChild("HumanoidRootPart") then
+			character.Humanoid:ChangeState(Enum.HumanoidStateType.Physics)
+			local hrp = character:FindFirstChild("HumanoidRootPart")
+			if hrp then
+				hrp.CFrame = hrp.CFrame * CFrame.Angles(math.rad(90), 0, 0)
+			end
+		end
 	end
 })
 
--- Misc Page
-local MiscPage = UI:addPage({title = "Misc"})
-local MiscSection = MiscPage:addSection({title = "Utility"})
-
-MiscSection:addKeybind({
-	title = "Lay on Ground",
-	default = layKey,
-	callback = function(key)
-		layKey = key
-	end
-})
-
--- Init
-UI:SelectPage(MainPage)
-UserInputService.InputBegan:Connect(onInputBegan)
