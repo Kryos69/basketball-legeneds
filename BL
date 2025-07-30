@@ -284,6 +284,8 @@ local function notifyAutoGuard(state)
 	})
 end
 
+-- Inside mainTab (only this part changed — rest of script stays the same)
+
 mainTab:CreateToggle({
 	Name = "Enable Auto Guard",
 	CurrentValue = false,
@@ -294,7 +296,6 @@ mainTab:CreateToggle({
 			currentTarget = nil
 			predictionSphere.Transparency = 1
 		end
-		notifyAutoGuard(state)
 	end
 })
 
@@ -307,7 +308,7 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
 				currentTarget = nil
 				predictionSphere.Transparency = 1
 			end
-			notifyAutoGuard(autoGuardActive)
 		end
 	end
 end)
+
