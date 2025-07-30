@@ -25,7 +25,7 @@ local Window = Rayfield:CreateWindow({
 
 local mainTab = Window:CreateTab("Main", 4483362458)
 local playerTab = Window:CreateTab("Player", 4483362458)
-local AntiExploiterTab = Window:CreateTab("Anti-Exploiter", 4483362458)
+local antiExploiterTab = Window:CreateTab("Anti-Exploiter", 4483362458) -- THIS must be here
 local miscTab = Window:CreateTab("Misc", 4483362458)
 
 
