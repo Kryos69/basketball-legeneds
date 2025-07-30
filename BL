@@ -201,3 +201,98 @@ playerTab:CreateToggle({
 		noclip()
 	end
 })
+
+-- === Auto Guard ===
+local autoGuardEnabled = false
+local currentTarget = nil
+local offsetDistance = 4
+
+local predictionSphere = Instance.new("Part")
+predictionSphere.Name = "PredictionSphere"
+predictionSphere.Shape = Enum.PartType.Ball
+predictionSphere.Anchored = true
+predictionSphere.CanCollide = false
+predictionSphere.Material = Enum.Material.Neon
+predictionSphere.Size = Vector3.new(2, 2, 2)
+predictionSphere.Color = Color3.fromRGB(255, 0, 0)
+predictionSphere.Transparency = 1
+predictionSphere.Parent = Workspace
+
+local function hasToolEquipped(character)
+	for _, item in ipairs(character:GetChildren()) do
+		if item:IsA("Tool") then return true end
+	end
+	return false
+end
+
+local function getFirstValidTarget()
+	local hrp = localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart")
+	if not hrp then return nil end
+
+	local closest, minDist = nil, math.huge
+	for _, player in ipairs(Players:GetPlayers()) do
+		if player ~= localPlayer and player.Character then
+			local targetHRP = player.Character:FindFirstChild("HumanoidRootPart")
+			if targetHRP and hasToolEquipped(player.Character) then
+				local dist = (hrp.Position - targetHRP.Position).Magnitude
+				if dist < minDist then
+					minDist = dist
+					closest = player
+				end
+			end
+		end
+	end
+	return closest
+end
+
+RunService.Heartbeat:Connect(function()
+	if not autoGuardEnabled then
+		predictionSphere.Transparency = 1
+		currentTarget = nil
+		return
+	end
+
+	local char = localPlayer.Character
+	local hrp = char and char:FindFirstChild("HumanoidRootPart")
+	if not hrp then return end
+
+	if not currentTarget then
+		currentTarget = getFirstValidTarget()
+	end
+
+	if currentTarget and currentTarget.Character then
+		local targetHRP = currentTarget.Character:FindFirstChild("HumanoidRootPart")
+		if hasToolEquipped(currentTarget.Character) and targetHRP then
+			local frontPos = targetHRP.Position + (targetHRP.CFrame.LookVector * offsetDistance)
+			predictionSphere.Position = frontPos
+			predictionSphere.Transparency = 0.5
+
+			hrp.CFrame = CFrame.new(frontPos, targetHRP.Position)
+		else
+			predictionSphere.Transparency = 1
+		end
+	end
+end)
+
+mainTab:CreateToggle({
+	Name = "Enable Auto Guard (T key toggle)",
+	CurrentValue = false,
+	Callback = function(state)
+		autoGuardEnabled = state
+		if not state then
+			currentTarget = nil
+			predictionSphere.Transparency = 1
+		end
+	end
+})
+
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+	if gameProcessed then return end
+	if input.KeyCode == Enum.KeyCode.T then
+		autoGuardEnabled = not autoGuardEnabled
+		if not autoGuardEnabled then
+			currentTarget = nil
+			predictionSphere.Transparency = 1
+		end
+	end
+end)
