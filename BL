@@ -203,7 +203,8 @@ playerTab:CreateToggle({
 })
 
 -- === Auto Guard ===
-local autoGuardEnabled = false
+local autoGuardUIEnabled = false  -- UI toggle controls if feature is allowed
+local autoGuardActive = false     -- Actual toggled state (via T key)
 local currentTarget = nil
 local offsetDistance = 4
 
@@ -246,7 +247,7 @@ local function getFirstValidTarget()
 end
 
 RunService.Heartbeat:Connect(function()
-	if not autoGuardEnabled then
+	if not autoGuardUIEnabled or not autoGuardActive then
 		predictionSphere.Transparency = 1
 		currentTarget = nil
 		return
@@ -274,25 +275,39 @@ RunService.Heartbeat:Connect(function()
 	end
 end)
 
+local function notifyAutoGuard(state)
+	Window:Notify({
+		Title = "Auto Guard",
+		Content = state and "Enabled" or "Disabled",
+		Duration = 3,
+		Callback = function() end
+	})
+end
+
 mainTab:CreateToggle({
-	Name = "Enable Auto Guard (T key toggle)",
+	Name = "Enable Auto Guard",
 	CurrentValue = false,
 	Callback = function(state)
-		autoGuardEnabled = state
+		autoGuardUIEnabled = state
 		if not state then
+			autoGuardActive = false
 			currentTarget = nil
 			predictionSphere.Transparency = 1
 		end
+		notifyAutoGuard(state)
 	end
 })
 
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
 	if gameProcessed then return end
 	if input.KeyCode == Enum.KeyCode.T then
-		autoGuardEnabled = not autoGuardEnabled
-		if not autoGuardEnabled then
-			currentTarget = nil
-			predictionSphere.Transparency = 1
+		if autoGuardUIEnabled then
+			autoGuardActive = not autoGuardActive
+			if not autoGuardActive then
+				currentTarget = nil
+				predictionSphere.Transparency = 1
+			end
+			notifyAutoGuard(autoGuardActive)
 		end
 	end
 end)
