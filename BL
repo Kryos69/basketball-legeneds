@@ -7,6 +7,7 @@ local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
+local StarterGui = game:GetService("StarterGui")
 
 local localPlayer = Players.LocalPlayer
 
@@ -276,11 +277,10 @@ RunService.Heartbeat:Connect(function()
 end)
 
 local function notifyAutoGuard(state)
-	Window:Notify({
+	StarterGui:SetCore("SendNotification", {
 		Title = "Auto Guard",
-		Content = state and "Enabled" or "Disabled",
+		Text = state and "Enabled" or "Disabled",
 		Duration = 3,
-		Callback = function() end
 	})
 end
 
