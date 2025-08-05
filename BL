@@ -1,26 +1,7 @@
--- // Game Check
-local targetGameId = 4581966615 -- Basketball Legends PlaceId
-if game.PlaceId ~= targetGameId then
-    game:GetService("Players").LocalPlayer:Kick("This script is designed for Basketball Legends only!")
-    return
-end
-
--- // Load Fluent UI Library with Error Handling
-local Fluent, SaveManager, InterfaceManager
-local fluentLoaded, fluentErr = pcall(function()
-    Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
-    SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/SaveManager.lua"))()
-    InterfaceManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/InterfaceManager.lua"))()
-end)
-
-if not fluentLoaded or not Fluent then
-    game:GetService("StarterGui"):SetCore("SendNotification", {
-        Title = "Error",
-        Text = "Failed to load Fluent UI: " .. tostring(fluentErr),
-        Duration = 5
-    })
-    return
-end
+-- // Load Fluent UI Library
+local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
+local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/SaveManager.lua"))()
+local InterfaceManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/InterfaceManager.lua"))()
 
 -- // Services
 local Players = game:GetService("Players")
@@ -31,113 +12,68 @@ local Workspace = game:GetService("Workspace")
 local StarterGui = game:GetService("StarterGui")
 
 local localPlayer = Players.LocalPlayer
+local ControlServiceRE = ReplicatedStorage.Packages.Knit.Services.ControlService.RE
+local StartShoot = ControlServiceRE.StartShoot
+local Shoot = ControlServiceRE.Shoot
 
--- // RemoteEvents
-local ControlServiceRE, StartShoot, Shoot
-local remotesLoaded, remoteErr = pcall(function()
-    ControlServiceRE = ReplicatedStorage:WaitForChild("Packages", 5):WaitForChild("Knit", 5):WaitForChild("Services", 5):WaitForChild("ControlService", 5):WaitForChild("RE", 5)
-    StartShoot = ControlServiceRE:WaitForChild("StartShoot", 5)
-    Shoot = ControlServiceRE:WaitForChild("Shoot", 5)
-end)
-
-if not remotesLoaded or not StartShoot or not Shoot then
-    StarterGui:SetCore("SendNotification", {
-        Title = "Error",
-        Text = "Failed to find RemoteEvents: " .. tostring(remoteErr),
-        Duration = 5
-    })
-    return
-end
-
--- // UI Setup
+-- // Fluent UI Setup
 local Window = Fluent:CreateWindow({
     Title = "Spare Stack - Fluent",
-    SubTitle = "Basketball Legends Script",
+    SubTitle = "Converted from Rayfield",
     TabWidth = 160,
     Size = UDim2.fromOffset(580, 460),
-    Acrylic = false,
+    Acrylic = false, -- Disabled to prevent full-screen blur
     Theme = "Dark",
     MinimizeKey = Enum.KeyCode.LeftControl
 })
 
 local Tabs = {
-    Home = Window:AddTab({ Title = "Home", Icon = "home" }),
-    Main = Window:AddTab({ Title = "Main", Icon = "zap" }),
-    Player = Window:AddTab({ Title = "Player", Icon = "user" }),
-    AntiExploiter = Window:AddTab({ Title = "Anti-Exploiter", Icon = "shield" }),
-    Misc = Window:AddTab({ Title = "Misc", Icon = "settings" })
+	Home = Window:AddTab({ Title = "Home", Icon = "" }),
+    Main = Window:AddTab({ Title = "Main", Icon = "" }),
+    Player = Window:AddTab({ Title = "Player", Icon = "" }),
+    AntiExploiter = Window:AddTab({ Title = "Anti-Exploiter", Icon = "" }),
+    Misc = Window:AddTab({ Title = "Misc", Icon = "" })
 }
 
 local Options = Fluent.Options
-
-Tabs.Home:AddParagraph({
-    Title = "Script Info",
-    Content = "Updated: Aug 4, 2025\nVersion: 1.0.1\nWelcome to Spare Stack!"
-})
-
--- // Auto Green (E Key)
 local autoGreenEnabled = false
 
 local function runShootingSequence()
-    local function fireSafe(remote, ...)
-        for i = 1, 3 do
-            local ok, err = pcall(function()
-                remote:FireServer(...)
-            end)
-            if ok then return true end
-            task.wait(0.1)
-        end
-        StarterGui:SetCore("SendNotification", {
-            Title = "Auto Green",
-            Text = "Failed to fire: " .. remote.Name,
-            Duration = 3
-        })
-        return false
-    end
-
-    -- use the helper function with arguments explicitly
-    coroutine.wrap(function()
-        if fireSafe(StartShoot) then
-            task.wait(0.23)
-            if fireSafe(Shoot, 1) then
-                task.wait(0.23)
-                fireSafe(Shoot, 0)
-            end
-        end
-    end)()
+    StartShoot:FireServer()
+    task.wait(0.23)
+    Shoot:FireServer(1)
+    task.wait(0.23)
+    Shoot:FireServer(0)
 end
 
-
-UserInputService.InputBegan:Connect(function(input, processed)
-    if processed then return end
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
     if autoGreenEnabled and input.KeyCode == Enum.KeyCode.E then
         runShootingSequence()
     end
 end)
 
-Tabs.Main:AddToggle("AutoGreen", {
-    Title = "Enable Auto Green (E)",
-    Default = false,
-    Description = "Press E to shoot automatically"
+Tabs.Main:AddToggle("AutoGreenToggle", {
+    Title = "Enable Auto Green (E key)",
+    Default = false
 }):OnChanged(function(state)
     autoGreenEnabled = state
 end)
 
--- // Walkspeed
 local walkspeedEnabled, walkspeedValue = false, 16
-local walkConn
+local moveConnection
 
-local function updateWalk()
-    if walkConn then walkConn:Disconnect() end
+local function cframeWalkspeed()
+    if moveConnection then moveConnection:Disconnect() end
     if walkspeedEnabled then
-        walkConn = RunService.Heartbeat:Connect(function(dt)
+        moveConnection = RunService.Heartbeat:Connect(function(dt)
             local char = localPlayer.Character
             local hrp = char and char:FindFirstChild("HumanoidRootPart")
             local hum = char and char:FindFirstChildOfClass("Humanoid")
             if hrp and hum then
-                local move = hum.MoveDirection
-                if move.Magnitude > 0 then
-                    hrp.CFrame += move.Unit * walkspeedValue * dt
+                local moveDir = hum.MoveDirection
+                if moveDir.Magnitude > 0 then
+                    hrp.CFrame += moveDir.Unit * walkspeedValue * dt
                 end
             end
         end)
@@ -149,7 +85,7 @@ Tabs.Player:AddToggle("WalkspeedToggle", {
     Default = false
 }):OnChanged(function(state)
     walkspeedEnabled = state
-    updateWalk()
+    cframeWalkspeed()
 end)
 
 Tabs.Player:AddSlider("WalkspeedSlider", {
@@ -162,25 +98,23 @@ Tabs.Player:AddSlider("WalkspeedSlider", {
     walkspeedValue = val
 end)
 
--- // Hitbox Expander
 local hitboxEnabled, hitboxRadius = false, 50
-local hitboxConn
+local hitboxConnection
 
 local function simulateTouch(ball)
-    local root = localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart")
-    if root and firetouchinterest then
-        pcall(function()
-            firetouchinterest(root, ball, 0)
-            task.wait()
-            firetouchinterest(root, ball, 1)
-        end)
+    local char = localPlayer.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if root then
+        firetouchinterest(root, ball, 0)
+        task.wait()
+        firetouchinterest(root, ball, 1)
     end
 end
 
-local function updateHitbox()
-    if hitboxConn then hitboxConn:Disconnect() end
+local function hitboxExpander()
+    if hitboxConnection then hitboxConnection:Disconnect() end
     if hitboxEnabled then
-        hitboxConn = RunService.Heartbeat:Connect(function()
+        hitboxConnection = RunService.Heartbeat:Connect(function()
             local root = localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart")
             if not root then return end
             for _, ball in pairs(Workspace:GetChildren()) do
@@ -199,23 +133,23 @@ Tabs.Player:AddToggle("HitboxToggle", {
     Default = false
 }):OnChanged(function(state)
     hitboxEnabled = state
-    updateHitbox()
+    hitboxExpander()
 end)
 
 Tabs.Player:AddSlider("HitboxSlider", {
     Title = "Hitbox Radius",
     Min = 10,
     Max = 100,
-    Default = 50
+    Default = 50,
+    Rounding = 0
 }):OnChanged(function(val)
     hitboxRadius = val
 end)
 
--- // Noclip
 local noclipEnabled = false
-local noclipConn
+local noclipConnection
 
-local function setCollision(state)
+local function setCollisions(state)
     local char = localPlayer.Character
     if not char then return end
     for _, p in ipairs(char:GetDescendants()) do
@@ -223,14 +157,19 @@ local function setCollision(state)
     end
 end
 
-local function updateNoclip()
-    if noclipConn then noclipConn:Disconnect() end
+local function noclip()
+    if noclipConnection then noclipConnection:Disconnect() end
     if noclipEnabled then
-        noclipConn = RunService.Stepped:Connect(function()
-            setCollision(false)
+        noclipConnection = RunService.Stepped:Connect(function()
+            local char = localPlayer.Character
+            if char then
+                for _, p in ipairs(char:GetDescendants()) do
+                    if p:IsA("BasePart") then p.CanCollide = false end
+                end
+            end
         end)
     else
-        setCollision(true)
+        setCollisions(true)
     end
 end
 
@@ -239,41 +178,40 @@ Tabs.Player:AddToggle("NoclipToggle", {
     Default = false
 }):OnChanged(function(state)
     noclipEnabled = state
-    updateNoclip()
+    noclip()
 end)
 
--- // Auto Guard
 local autoGuardUIEnabled, autoGuardActive = false, false
 local currentTarget = nil
 local offsetDistance = 4
 
 local predictionSphere = Instance.new("Part")
+predictionSphere.Name = "PredictionSphere"
+predictionSphere.Shape = Enum.PartType.Ball
 predictionSphere.Anchored = true
 predictionSphere.CanCollide = false
 predictionSphere.Material = Enum.Material.Neon
 predictionSphere.Size = Vector3.new(2, 2, 2)
-predictionSphere.Shape = Enum.PartType.Ball
+predictionSphere.Color = Color3.fromRGB(255, 0, 0)
 predictionSphere.Transparency = 1
-predictionSphere.Color = Color3.new(1, 0, 0)
-predictionSphere.Name = "PredictionSphere"
 predictionSphere.Parent = Workspace
 
 local function hasToolEquipped(char)
-    for _, item in pairs(char:GetChildren()) do
+    for _, item in ipairs(char:GetChildren()) do
         if item:IsA("Tool") then return true end
     end
     return false
 end
 
-local function getClosestPlayer()
-    local root = localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart")
-    if not root then return nil end
+local function getFirstValidTarget()
+    local hrp = localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart")
+    if not hrp then return nil end
     local closest, minDist = nil, math.huge
     for _, plr in ipairs(Players:GetPlayers()) do
         if plr ~= localPlayer and plr.Character then
-            local hrp = plr.Character:FindFirstChild("HumanoidRootPart")
-            if hrp and hasToolEquipped(plr.Character) then
-                local dist = (hrp.Position - root.Position).Magnitude
+            local tHRP = plr.Character:FindFirstChild("HumanoidRootPart")
+            if tHRP and hasToolEquipped(plr.Character) then
+                local dist = (hrp.Position - tHRP.Position).Magnitude
                 if dist < minDist then
                     minDist = dist
                     closest = plr
@@ -291,51 +229,52 @@ RunService.Heartbeat:Connect(function()
         return
     end
 
-    local root = localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart")
-    if not root then return end
+    local hrp = localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
 
     if not currentTarget then
-        currentTarget = getClosestPlayer()
+        currentTarget = getFirstValidTarget()
     end
 
     if currentTarget and currentTarget.Character then
         local tHRP = currentTarget.Character:FindFirstChild("HumanoidRootPart")
         if hasToolEquipped(currentTarget.Character) and tHRP then
-            local predicted = tHRP.Position + tHRP.CFrame.LookVector * offsetDistance
-            predictionSphere.Position = predicted
-            predictionSphere.Transparency = 0.4
-            root.CFrame = CFrame.new(predicted, tHRP.Position)
+            local frontPos = tHRP.Position + tHRP.CFrame.LookVector * offsetDistance
+            predictionSphere.Position = frontPos
+            predictionSphere.Transparency = 0.5
+            hrp.CFrame = CFrame.new(frontPos, tHRP.Position)
         else
             predictionSphere.Transparency = 1
-            currentTarget = nil
         end
     end
 end)
 
 Tabs.Main:AddToggle("AutoGuardToggle", {
     Title = "Enable Auto Guard",
-    Default = false,
-    Description = "Press T to toggle targeting"
+    Default = false
 }):OnChanged(function(state)
     autoGuardUIEnabled = state
     if not state then
         autoGuardActive = false
-        predictionSphere.Transparency = 1
         currentTarget = nil
+        predictionSphere.Transparency = 1
     end
 end)
 
-UserInputService.InputBegan:Connect(function(input, processed)
-    if processed then return end
-    if input.KeyCode == Enum.KeyCode.T and autoGuardUIEnabled then
-        autoGuardActive = not autoGuardActive
-        if not autoGuardActive then
-            predictionSphere.Transparency = 1
-            currentTarget = nil
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if input.KeyCode == Enum.KeyCode.T then
+        if autoGuardUIEnabled then
+            autoGuardActive = not autoGuardActive
+            if not autoGuardActive then
+                currentTarget = nil
+                predictionSphere.Transparency = 1
+            end
+            StarterGui:SetCore("SendNotification", {
+                Title = "Auto Guard",
+                Text = autoGuardActive and "Enabled" or "Disabled",
+                Duration = 3,
+            })
         end
     end
 end)
-
--- // Save + Interface Manager
-SaveManager:BuildConfigSection(Tabs.Misc)
-InterfaceManager:BuildInterfaceSection(Tabs.Misc)
