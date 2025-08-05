@@ -1,7 +1,26 @@
--- // Load Fluent UI Library
-local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
-local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/SaveManager.lua"))()
-local InterfaceManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/InterfaceManager.lua"))()
+-- // Game Check
+local targetGameId = 4581966615 -- Basketball Legends PlaceId
+if game.PlaceId ~= targetGameId then
+    game:GetService("Players").LocalPlayer:Kick("This script is designed for Basketball Legends only!")
+    return
+end
+
+-- // Load Fluent UI Library with Error Handling
+local Fluent, SaveManager, InterfaceManager
+local success, err = pcall(function()
+    Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
+    SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/SaveManager.lua"))()
+    InterfaceManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/InterfaceManager.lua"))()
+end)
+
+if not success or not Fluent then
+    game:GetService("StarterGui"):SetCore("SendNotification", {
+        Title = "Error",
+        Text = "Failed to load Fluent UI library: " .. tostring(err),
+        Duration = 5
+    })
+    return
+end
 
 -- // Services
 local Players = game:GetService("Players")
@@ -12,9 +31,23 @@ local Workspace = game:GetService("Workspace")
 local StarterGui = game:GetService("StarterGui")
 
 local localPlayer = Players.LocalPlayer
-local ControlServiceRE = ReplicatedStorage:WaitForChild("Packages", 5):WaitForChild("Knit", 5):WaitForChild("Services", 5):WaitForChild("ControlService", 5):WaitForChild("RE", 5)
-local StartShoot = ControlServiceRE:WaitForChild("StartShoot", 5)
-local Shoot = ControlServiceRE:WaitForChild("Shoot", 5)
+
+-- // RemoteEvents with Error Handling
+local ControlServiceRE, StartShoot, Shoot
+local success, err = pcall(function()
+    ControlServiceRE = ReplicatedStorage:WaitForChild("Packages", 5):WaitForChild("Knit", 5):WaitForChild("Services", 5):WaitForChild("ControlService", 5):WaitForChild("RE", 5)
+    StartShoot = ControlServiceRE:WaitForChild("StartShoot", 5)
+    Shoot = ControlServiceRE:WaitForChild("Shoot", 5)
+end)
+
+if not success or not StartShoot or not Shoot then
+    StarterGui:SetCore("SendNotification", {
+        Title = "Error",
+        Text = "Failed to find RemoteEvents: " .. tostring(err),
+        Duration = 5
+    })
+    return
+end
 
 -- // Fluent UI Setup
 local Window = Fluent:CreateWindow({
@@ -40,33 +73,27 @@ local Options = Fluent.Options
 -- // Home Tab Content
 Tabs.Home:AddParagraph({
     Title = "Script Information",
-    Content = "Last Updated: August 4, 2025\nVersion: 1.0.0\nOwner: YourName\n\nWelcome to Spare Stack! Use the tabs to access features like Auto Green, Walkspeed, and more."
+    Content = "Last Updated: August 4, 2025\nVersion: 1.0.1\nOwner: YourName\n\nWelcome to Spare Stack! Use the tabs to access features like Auto Green, Walkspeed, and more."
 })
 
 -- // Auto Green Feature
 local autoGreenEnabled = false
 
 local function runShootingSequence()
-    if not StartShoot or not Shoot then
+    local function fireWithRetry(remote, ...)
+        local attempts = 3
+        local success, err
+        for i = 1, attempts do
+            success, err = pcall(function() remote:FireServer(...) end)
+            if success then return true end
+            task.wait(0.1) -- Small delay between retries
+        end
         StarterGui:SetCore("SendNotification", {
             Title = "Error",
-            Text = "Shoot RemoteEvents not found!",
+            Text = "Failed to fire " .. remote.Name .. " after " .. attempts .. " attempts: " .. tostring(err),
             Duration = 3
         })
-        return
-    end
-
-    local function fireWithRetry(remote, ...)
-        local success, err = pcall(function() remote:FireServer(...) end)
-        if not success then
-            StarterGui:SetCore("SendNotification", {
-                Title = "Error",
-                Text = "Failed to fire " .. remote.Name .. ": " .. tostring(err),
-                Duration = 3
-            })
-            return false
-        end
-        return true
+        return false
     end
 
     coroutine.wrap(function()
