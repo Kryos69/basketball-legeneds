@@ -12,9 +12,9 @@ local Workspace = game:GetService("Workspace")
 local StarterGui = game:GetService("StarterGui")
 
 local localPlayer = Players.LocalPlayer
-local ControlServiceRE = ReplicatedStorage.Packages.Knit.Services.ControlService.RE
-local StartShoot = ControlServiceRE.StartShoot
-local Shoot = ControlServiceRE.Shoot
+local ControlServiceRE = ReplicatedStorage:WaitForChild("Packages", 5):WaitForChild("Knit", 5):WaitForChild("Services", 5):WaitForChild("ControlService", 5):WaitForChild("RE", 5)
+local StartShoot = ControlServiceRE:WaitForChild("StartShoot", 5)
+local Shoot = ControlServiceRE:WaitForChild("Shoot", 5)
 
 -- // Fluent UI Setup
 local Window = Fluent:CreateWindow({
@@ -28,22 +28,56 @@ local Window = Fluent:CreateWindow({
 })
 
 local Tabs = {
-	Home = Window:AddTab({ Title = "Home", Icon = "" }),
-    Main = Window:AddTab({ Title = "Main", Icon = "" }),
-    Player = Window:AddTab({ Title = "Player", Icon = "" }),
-    AntiExploiter = Window:AddTab({ Title = "Anti-Exploiter", Icon = "" }),
-    Misc = Window:AddTab({ Title = "Misc", Icon = "" })
+    Home = Window:AddTab({ Title = "Home", Icon = "home" }),
+    Main = Window:AddTab({ Title = "Main", Icon = "zap" }),
+    Player = Window:AddTab({ Title = "Player", Icon = "user" }),
+    AntiExploiter = Window:AddTab({ Title = "Anti-Exploiter", Icon = "shield" }),
+    Misc = Window:AddTab({ Title = "Misc", Icon = "settings" })
 }
 
 local Options = Fluent.Options
+
+-- // Home Tab Content
+Tabs.Home:AddParagraph({
+    Title = "Script Information",
+    Content = "Last Updated: August 4, 2025\nVersion: 1.0.0\nOwner: YourName\n\nWelcome to Spare Stack! Use the tabs to access features like Auto Green, Walkspeed, and more."
+})
+
+-- // Auto Green Feature
 local autoGreenEnabled = false
 
 local function runShootingSequence()
-    StartShoot:FireServer()
-    task.wait(0.23)
-    Shoot:FireServer(1)
-    task.wait(0.23)
-    Shoot:FireServer(0)
+    if not StartShoot or not Shoot then
+        StarterGui:SetCore("SendNotification", {
+            Title = "Error",
+            Text = "Shoot RemoteEvents not found!",
+            Duration = 3
+        })
+        return
+    end
+
+    local function fireWithRetry(remote, ...)
+        local success, err = pcall(function() remote:FireServer(...) end)
+        if not success then
+            StarterGui:SetCore("SendNotification", {
+                Title = "Error",
+                Text = "Failed to fire " .. remote.Name .. ": " .. tostring(err),
+                Duration = 3
+            })
+            return false
+        end
+        return true
+    end
+
+    coroutine.wrap(function()
+        if fireWithRetry(StartShoot) then
+            task.wait(0.23)
+            if fireWithRetry(Shoot, 1) then
+                task.wait(0.23)
+                fireWithRetry(Shoot, 0)
+            end
+        end
+    end)()
 end
 
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
@@ -55,11 +89,18 @@ end)
 
 Tabs.Main:AddToggle("AutoGreenToggle", {
     Title = "Enable Auto Green (E key)",
-    Default = false
+    Default = false,
+    Description = "Press E to trigger the shooting sequence automatically."
 }):OnChanged(function(state)
     autoGreenEnabled = state
+    StarterGui:SetCore("SendNotification", {
+        Title = "Auto Green",
+        Text = state and "Enabled" or "Disabled",
+        Duration = 3
+    })
 end)
 
+-- // Walkspeed Feature
 local walkspeedEnabled, walkspeedValue = false, 16
 local moveConnection
 
@@ -73,7 +114,7 @@ local function cframeWalkspeed()
             if hrp and hum then
                 local moveDir = hum.MoveDirection
                 if moveDir.Magnitude > 0 then
-                    hrp.CFrame += moveDir.Unit * walkspeedValue * dt
+                    hrp.CFrame = hrp.CFrame + moveDir.Unit * walkspeedValue * dt
                 end
             end
         end)
@@ -82,14 +123,21 @@ end
 
 Tabs.Player:AddToggle("WalkspeedToggle", {
     Title = "Enable Walkspeed",
-    Default = false
+    Default = false,
+    Description = "Adjust your movement speed."
 }):OnChanged(function(state)
     walkspeedEnabled = state
     cframeWalkspeed()
+    StarterGui:SetCore("SendNotification", {
+        Title = "Walkspeed",
+        Text = state and "Enabled" or "Disabled",
+        Duration = 3
+    })
 end)
 
 Tabs.Player:AddSlider("WalkspeedSlider", {
     Title = "Walkspeed Value",
+    Description = "Set your custom walkspeed.",
     Min = 1,
     Max = 100,
     Default = 16,
@@ -98,6 +146,7 @@ Tabs.Player:AddSlider("WalkspeedSlider", {
     walkspeedValue = val
 end)
 
+-- // Hitbox Expander Feature
 local hitboxEnabled, hitboxRadius = false, 50
 local hitboxConnection
 
@@ -105,9 +154,11 @@ local function simulateTouch(ball)
     local char = localPlayer.Character
     local root = char and char:FindFirstChild("HumanoidRootPart")
     if root then
-        firetouchinterest(root, ball, 0)
-        task.wait()
-        firetouchinterest(root, ball, 1)
+        pcall(function()
+            firetouchinterest(root, ball, 0)
+            task.wait()
+            firetouchinterest(root, ball, 1)
+        end)
     end
 end
 
@@ -130,14 +181,21 @@ end
 
 Tabs.Player:AddToggle("HitboxToggle", {
     Title = "Enable Hitbox Expander",
-    Default = false
+    Default = false,
+    Description = "Increase the hitbox radius for basketballs."
 }):OnChanged(function(state)
     hitboxEnabled = state
     hitboxExpander()
+    StarterGui:SetCore("SendNotification", {
+        Title = "Hitbox Expander",
+        Text = state and "Enabled" or "Disabled",
+        Duration = 3
+    })
 end)
 
 Tabs.Player:AddSlider("HitboxSlider", {
     Title = "Hitbox Radius",
+    Description = "Set the radius for the hitbox expander.",
     Min = 10,
     Max = 100,
     Default = 50,
@@ -146,6 +204,7 @@ Tabs.Player:AddSlider("HitboxSlider", {
     hitboxRadius = val
 end)
 
+-- // Noclip Feature
 local noclipEnabled = false
 local noclipConnection
 
@@ -175,12 +234,19 @@ end
 
 Tabs.Player:AddToggle("NoclipToggle", {
     Title = "Enable Noclip",
-    Default = false
+    Default = false,
+    Description = "Pass through walls and objects."
 }):OnChanged(function(state)
     noclipEnabled = state
     noclip()
+    StarterGui:SetCore("SendNotification", {
+        Title = "Noclip",
+        Text = state and "Enabled" or "Disabled",
+        Duration = 3
+    })
 end)
 
+-- // Auto Guard Feature
 local autoGuardUIEnabled, autoGuardActive = false, false
 local currentTarget = nil
 local offsetDistance = 4
@@ -197,6 +263,7 @@ predictionSphere.Transparency = 1
 predictionSphere.Parent = Workspace
 
 local function hasToolEquipped(char)
+    if not char then return false end
     for _, item in ipairs(char:GetChildren()) do
         if item:IsA("Tool") then return true end
     end
@@ -245,13 +312,15 @@ RunService.Heartbeat:Connect(function()
             hrp.CFrame = CFrame.new(frontPos, tHRP.Position)
         else
             predictionSphere.Transparency = 1
+            currentTarget = nil
         end
     end
 end)
 
 Tabs.Main:AddToggle("AutoGuardToggle", {
     Title = "Enable Auto Guard",
-    Default = false
+    Default = false,
+    Description = "Press T to toggle tracking of players with tools."
 }):OnChanged(function(state)
     autoGuardUIEnabled = state
     if not state then
@@ -259,6 +328,11 @@ Tabs.Main:AddToggle("AutoGuardToggle", {
         currentTarget = nil
         predictionSphere.Transparency = 1
     end
+    StarterGui:SetCore("SendNotification", {
+        Title = "Auto Guard",
+        Text = state and "Enabled (Press T to toggle)" or "Disabled",
+        Duration = 3
+    })
 end)
 
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
@@ -272,9 +346,13 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
             end
             StarterGui:SetCore("SendNotification", {
                 Title = "Auto Guard",
-                Text = autoGuardActive and "Enabled" or "Disabled",
-                Duration = 3,
+                Text = autoGuardActive and "Tracking Enabled" or "Tracking Disabled",
+                Duration = 3
             })
         end
     end
 end)
+
+-- // Initialize Save and Interface Managers
+SaveManager:BuildConfigSection(Tabs.Misc)
+InterfaceManager:BuildInterfaceSection(Tabs.Misc)
